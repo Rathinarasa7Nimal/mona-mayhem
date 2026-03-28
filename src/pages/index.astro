@@ -9,9 +9,234 @@
 		<meta name="viewport" content="width=device-width" />
 		<meta name="generator" content={Astro.generator} />
 		<title>Mona Mayhem</title>
+		<style>
+			body {
+				font-family: monospace;
+				background: #0d1117;
+				color: #c9d1d9;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				padding: 2rem;
+				margin: 0;
+			}
+
+			h1 {
+				font-size: 2rem;
+				margin-bottom: 0.25rem;
+			}
+
+			p.subtitle {
+				color: #8b949e;
+				margin-bottom: 2rem;
+			}
+
+			.battle-form {
+				display: flex;
+				gap: 1rem;
+				align-items: flex-end;
+				flex-wrap: wrap;
+				justify-content: center;
+				margin-bottom: 2rem;
+			}
+
+			.player {
+				display: flex;
+				flex-direction: column;
+				gap: 0.5rem;
+			}
+
+			label {
+				font-size: 0.85rem;
+				color: #8b949e;
+			}
+
+			input[type="text"] {
+				background: #161b22;
+				border: 1px solid #30363d;
+				color: #c9d1d9;
+				padding: 0.5rem 0.75rem;
+				font-family: monospace;
+				font-size: 1rem;
+				border-radius: 4px;
+				width: 180px;
+			}
+
+			input[type="text"]:focus {
+				outline: none;
+				border-color: #58a6ff;
+			}
+
+			.vs {
+				font-size: 1.25rem;
+				padding-bottom: 0.5rem;
+				color: #f78166;
+			}
+
+			button#battle-btn {
+				background: #238636;
+				color: #fff;
+				border: none;
+				padding: 0.55rem 1.5rem;
+				font-family: monospace;
+				font-size: 1rem;
+				border-radius: 4px;
+				cursor: pointer;
+			}
+
+			button#battle-btn:hover {
+				background: #2ea043;
+			}
+
+			button#battle-btn:disabled {
+				background: #21262d;
+				color: #8b949e;
+				cursor: not-allowed;
+			}
+
+			#results {
+				width: 100%;
+				max-width: 600px;
+				background: #161b22;
+				border: 1px solid #30363d;
+				border-radius: 6px;
+				padding: 1.5rem;
+				display: none;
+			}
+
+			#results h2 {
+				margin-top: 0;
+				font-size: 1.1rem;
+				border-bottom: 1px solid #30363d;
+				padding-bottom: 0.5rem;
+				margin-bottom: 1rem;
+			}
+
+			.result-row {
+				display: flex;
+				justify-content: space-between;
+				margin-bottom: 0.5rem;
+			}
+
+			.result-row .username {
+				color: #58a6ff;
+			}
+
+			.result-row .score {
+				font-weight: bold;
+			}
+
+			#winner {
+				margin-top: 1rem;
+				text-align: center;
+				font-size: 1.1rem;
+				color: #ffa657;
+			}
+
+			#error-msg {
+				color: #f78166;
+				margin-top: 0.5rem;
+				display: none;
+			}
+		</style>
 	</head>
 	<body>
-		<h1>Mona Mayhem</h1>
-		<p>Welcome to Mona Mayhem! Time to build a GitHub Contribution Battle Arena.</p>
+		<h1>⚔️ Mona Mayhem</h1>
+		<p class="subtitle">GitHub Contribution Battle Arena</p>
+
+		<div class="battle-form">
+			<div class="player">
+				<label for="player1">Player 1</label>
+				<input type="text" id="player1" placeholder="github username" />
+			</div>
+
+			<span class="vs">VS</span>
+
+			<div class="player">
+				<label for="player2">Player 2</label>
+				<input type="text" id="player2" placeholder="github username" />
+			</div>
+
+			<button id="battle-btn">⚔️ Battle!</button>
+		</div>
+
+		<p id="error-msg"></p>
+
+		<div id="results">
+			<h2>📊 Battle Results</h2>
+			<div class="result-row">
+				<span class="username" id="p1-name"></span>
+				<span class="score" id="p1-score"></span>
+			</div>
+			<div class="result-row">
+				<span class="username" id="p2-name"></span>
+				<span class="score" id="p2-score"></span>
+			</div>
+			<p id="winner"></p>
+		</div>
+
+		<script>
+			const btn = document.getElementById('battle-btn') as HTMLButtonElement;
+			const resultsDiv = document.getElementById('results') as HTMLDivElement;
+			const errorMsg = document.getElementById('error-msg') as HTMLParagraphElement;
+
+			btn.addEventListener('click', async () => {
+				const p1 = (document.getElementById('player1') as HTMLInputElement).value.trim();
+				const p2 = (document.getElementById('player2') as HTMLInputElement).value.trim();
+
+				errorMsg.style.display = 'none';
+				resultsDiv.style.display = 'none';
+
+				if (!p1 || !p2) {
+					errorMsg.textContent = 'Please enter both usernames.';
+					errorMsg.style.display = 'block';
+					return;
+				}
+
+				btn.disabled = true;
+				btn.textContent = 'Loading…';
+
+				try {
+					const [res1, res2] = await Promise.all([
+						fetch(`/api/contributions/${encodeURIComponent(p1)}`),
+						fetch(`/api/contributions/${encodeURIComponent(p2)}`),
+					]);
+
+					if (!res1.ok) {
+						throw new Error(`Could not fetch data for "${p1}" (status ${res1.status}).`);
+					}
+					if (!res2.ok) {
+						throw new Error(`Could not fetch data for "${p2}" (status ${res2.status}).`);
+					}
+
+					const [data1, data2] = await Promise.all([res1.json(), res2.json()]);
+
+					const score1: number = data1.totalContributions ?? 0;
+					const score2: number = data2.totalContributions ?? 0;
+
+					(document.getElementById('p1-name') as HTMLElement).textContent = p1;
+					(document.getElementById('p1-score') as HTMLElement).textContent = `${score1} contributions`;
+					(document.getElementById('p2-name') as HTMLElement).textContent = p2;
+					(document.getElementById('p2-score') as HTMLElement).textContent = `${score2} contributions`;
+
+					const winnerEl = document.getElementById('winner') as HTMLElement;
+					if (score1 > score2) {
+						winnerEl.textContent = `🏆 ${p1} wins!`;
+					} else if (score2 > score1) {
+						winnerEl.textContent = `🏆 ${p2} wins!`;
+					} else {
+						winnerEl.textContent = "🤝 It's a tie!";
+					}
+
+					resultsDiv.style.display = 'block';
+				} catch (err) {
+					errorMsg.textContent = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+					errorMsg.style.display = 'block';
+				} finally {
+					btn.disabled = false;
+					btn.textContent = '⚔️ Battle!';
+				}
+			});
+		</script>
 	</body>
 </html>
